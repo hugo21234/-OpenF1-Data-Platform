@@ -1,15 +1,15 @@
-from Request.OpenF1_Client import RequestFactory as rf
-
-endpoint_car_data = "/car_data"
+from Request.OpenF1_Client import RequestFactory
 
 class ExtractorCarData:
-    def __init__(self):
-        self.client = rf(endpoint_car_data)
+    def __init__(self, client: RequestFactory):
+        self.client = client
         
     
-    def extractCarData(self, driver_number: int) -> list:
-        params = self.client.params.copy()
-        params['driver_number'] = driver_number   
-        response = self.client.get_data(params, endpoint_car_data)
-        print(response)
+    def extractCarData(self, endpoint: str, driver_number: int, params: dict | None = None) -> list:
+        request_params = params.copy() if params else {}
+
+        request_params["driver_number"] = driver_number
+
+        response = self.client.get_data(endpoint, request_params)
+
         return response
