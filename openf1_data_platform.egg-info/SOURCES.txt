@@ -1,0 +1,12 @@
+README.md
+pyproject.toml
+Request/OpenF1_Client.py
+Request/__init__.py
+extrator/__init__.py
+extrator/extractor_car_data.py
+extrator/extractor_driver.py
+openf1_data_platform.egg-info/PKG-INFO
+openf1_data_platform.egg-info/SOURCES.txt
+openf1_data_platform.egg-info/dependency_links.txt
+openf1_data_platform.egg-info/requires.txt
+openf1_data_platform.egg-info/top_level.txt
