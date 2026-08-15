@@ -19,6 +19,7 @@ class RequestFactory:
                     timeout=self.timeout,
                 )
                 response.raise_for_status()
+                
                 return response.json()
             except (
                 requests.exceptions.ReadTimeout,

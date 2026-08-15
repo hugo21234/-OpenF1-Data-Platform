@@ -1,9 +1,0 @@
-from Request.OpenF1_Client import RequestFactory
-
-class ExtractorDriver:
-    def __init__(self, client: RequestFactory):
-        self.client = client
-    
-    def extractDrivers(self, endpoint: str, params: dict | None = None) -> list:
-        response = self.client.get_data(endpoint, params)
-        return response
