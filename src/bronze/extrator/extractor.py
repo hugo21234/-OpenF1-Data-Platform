@@ -1,5 +1,5 @@
 from Request.OpenF1_Client import RequestFactory
-from extrator.extractor_session import ExtractorSession
+from bronze.extrator.extractor_session import ExtractorSession
 
 import time
 

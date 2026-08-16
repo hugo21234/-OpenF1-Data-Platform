@@ -1,4 +1,5 @@
 from os import read
+from io import BytesIO
 import os
 import requests
 from dotenv import load_dotenv
@@ -20,11 +21,21 @@ class ingestion:
 
 
     def process_data(self):
-       to_parquet = self.dataframe.to_parquet(f"{self.source}_{self.session_key}.parquet", index=False)
+       to_parquet = self.dataframe.to_parquet(index=False)
        return to_parquet
 
-    def save_data(self, destination):
-        process_data = self.process_data()
-        print(f"Data saved to {destination}/{self.source}_{self.session_key}.parquet")
-        requests.put(self.url, data=process_data, headers={"Authorization": f"Bearer {self.databricks_access_token}"})
+    def validar_data(self):
+        parquet_data = self.process_data()
+        data = pd.read_parquet(BytesIO(parquet_data))
+        if data.empty:
+            print("No data to save.")
+            return False
+        save_data = data
+        return True
+
+    def save_data(self, data):
+
+        print(f"Data saved to {self.source}_{self.session_key}.parquet")
+
+        requests.put(self.url, data=data, headers={"Authorization": f"Bearer {self.databricks_access_token}"})
         return None
