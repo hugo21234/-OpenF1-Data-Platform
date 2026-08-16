@@ -29,6 +29,6 @@ class RequestFactory:
                 if attempt == 2:
                     raise
 
-                time.sleep(2 ** attempt)
+                time.sleep(3 ** attempt)
             except requests.exceptions.HTTPError as e:
                     raise e

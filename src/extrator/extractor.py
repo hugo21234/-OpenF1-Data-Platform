@@ -19,16 +19,16 @@ class extractor:
                 "stints": "/stints",
                 "pit": "/pit",
                 "position": "/position",
-                "race_control": "/race_control",
-                "car_data": "/car_data"
+                "race_control": "/race_control"
     }
+        self.endpoint_car_data = {"car_data": "/car_data"}
         self.now = time.localtime()
         self.year = self.now.tm_year
 
         self.validar = validar_sessionkey()
     
     def extractSessions(self) -> list[dict]:
-        return ExtractorSession(self.client).extractSessions(self.endpoints["sessions"], params={"year": self.year, "session_name": "Race"})
+        return ExtractorSession(self.client).extractSessions(self.endpoints["sessions"], params={"year": self.year, "session_name": "Race", "is_cancelled": False})
 
 
 
@@ -50,27 +50,24 @@ class extractor:
                     data = self.client.get_data(endpoint, params)
                     drivers_numbers = [driver['driver_number'] for driver in data]
 
-                elif endpoint == '/car_data':
-
-                    for driver_number in drivers_numbers:
-
-                        params_car = params.copy()
-                        params_car['driver_number'] = driver_number
-                        data = self.client.get_data(endpoint, params_car)
-                        print(f"Car data for driver {params_car['driver_number']}: {data}")
-                        #ingestion = self.client_ingestion.save_data(data, destination=f"data/{endpoint.strip('/')}_{session_key}.json")
-
-                        print(f"Car data for driver {params_car['driver_number']}: {data}")
-                        time.sleep(3)  # Sleep for 3 seconds between requests to avoid overwhelming the API
-                    continue
 
                 else:
                     data = self.client.get_data(endpoint, params)
                     print(f"Data for endpoint {endpoint}: {data}")
-                    time.sleep(3)  # Sleep for 3 seconds between requests to avoid overwhelming the API
+                    time.sleep(2)  # Sleep for 2 seconds between requests to avoid overwhelming the API
 
                 #ingestion = self.client_ingestion.save_data(data, destination=f"data/{endpoint.strip('/')}_{session_key}.json")
+
+            extractor.extractCarData(self, session_key, drivers_numbers)
             
+    def extractCarData(self, session_key: int, drivers_numbers: list[int]):
+                endpoint = self.endpoint_car_data["car_data"]
+                for driver_number in drivers_numbers:
+                            data = self.client.get_data(endpoint,params={"session_key": session_key, "driver_number": driver_number})
+                            print(f"Car data | session={session_key} "f"| driver={driver_number} "f"| registros={len(data)}")
+                            #ingestion = self.client_ingestion.save_data(data, destination=f"data/{endpoint.strip('/')}_{session_key}.json")
+                            time.sleep(3)  # Sleep for 3 seconds between requests to avoid overwhelming the API
+                            continue
 
 
 run = extractor(RequestFactory())
