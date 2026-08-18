@@ -2,8 +2,9 @@ import time
 
 import requests
 
-from Request.OpenF1_Client import RequestFactory
-from bronze.extrator.extractor import extractor
+from Request.OpenF1_Client import OpenF1Client
+from bronze.extrator.extractor import BronzeExtractor
+from bronze.ingestion.storage import DatabricksBronzeStorage
 
 
 def main() -> None:
@@ -11,7 +12,10 @@ def main() -> None:
     print("Iniciando teste da camada Bronze...")
 
     try:
-        bronze_extractor = extractor(RequestFactory())
+        bronze_extractor = BronzeExtractor(
+            client=OpenF1Client(),
+            storage=DatabricksBronzeStorage(),
+        )
         bronze_extractor.run_extraction()
     except ValueError as error:
         print(f"Erro de configuração: {error}")

@@ -2,7 +2,10 @@ import time
 
 import requests
 
-class RequestFactory:
+from bronze.contracts import DataClient
+
+
+class OpenF1Client(DataClient):
     def __init__(self) -> None:
         self.base_url = 'https://api.openf1.org/v1'
 
@@ -30,5 +33,5 @@ class RequestFactory:
                     raise
 
                 time.sleep(3 ** attempt)
-            except requests.exceptions.HTTPError as e:
-                    raise e
+            except requests.exceptions.HTTPError:
+                raise

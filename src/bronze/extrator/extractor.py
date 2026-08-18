@@ -1,96 +1,103 @@
-from Request.OpenF1_Client import RequestFactory
-from bronze.extrator.extractor_session import ExtractorSession
-
 import time
 
-from bronze.ingestion.Ingestion_bronze import ingestion
+from bronze.contracts import BronzeStorage, DataClient, Extractor
 
 
-class extractor:
-    def __init__(self, client: RequestFactory) -> None:
+class BronzeExtractor(Extractor):
+    ENDPOINTS = (
+        "/drivers",
+        "/laps",
+        "/stints",
+        "/pit",
+        "/position",
+        "/race_control",
+    )
+    SESSIONS_ENDPOINT = "/sessions"
+    CAR_DATA_ENDPOINT = "/car_data"
+
+    def __init__(self, client: DataClient, storage: BronzeStorage) -> None:
         self.client = client
-        self.endpoints = {
-                "sessions": "/sessions",
-                "drivers": "/drivers",
-                "laps": "/laps",
-                "stints": "/stints",
-                "pit": "/pit",
-                "position": "/position",
-                "race_control": "/race_control"
-    }
-        self.endpoint_car_data = {"car_data": "/car_data"}
-        self.now = time.localtime()
-        self.year = self.now.tm_year
+        self.storage = storage
 
+    def extract_sessions(self) -> list[dict]:
+        return self.client.get_data(
+            self.SESSIONS_ENDPOINT,
+            params={
+                "year": time.localtime().tm_year,
+                "session_name": "Race",
+                "is_cancelled": False,
+            },
+        )
 
-    def extractSessions(self) -> list[dict]:
-        return ExtractorSession(self.client).extractSessions(self.endpoints["sessions"], params={"year": self.year, "session_name": "Race", "is_cancelled": False})
-
-
-
-    def run_extraction(self):
-        for session in self.extractSessions():
-
+    def run_extraction(self) -> None:
+        for session in self.extract_sessions():
             session_key = session["session_key"]
-            params = {'session_key': session_key}
+            session_key_text = str(session_key)
+            drivers_numbers: list[int] = []
 
-            for endpoint in list(self.endpoints.values())[1:]:
+            for endpoint in self.ENDPOINTS:
+                source = endpoint.strip("/")
 
-                client_ingestion = ingestion(
-                    source=endpoint.strip('/'),
-                    session_key=str(session_key),
-                )
-
-                data_exists = client_ingestion.file_exists()
-
-                if endpoint == '/drivers':
-
-                    data = self.client.get_data(endpoint, params)
-                    drivers_numbers = [driver['driver_number'] for driver in data]
-
-                    if data_exists:
-                        print(f"Data already exists: session_key={session_key}/{endpoint.strip('/')}.parquet")
+                if endpoint == "/drivers":
+                    data = self.client.get_data(
+                        endpoint,
+                        {"session_key": session_key},
+                    )
+                    drivers_numbers = [
+                        driver["driver_number"] for driver in data
+                    ]
+                    if self.storage.exists(source, session_key_text):
+                        self._print_existing(source, session_key_text)
                         continue
-                    
-
                 else:
-
-                    if data_exists:
-                        print(f"Data already exists: session_key={session_key}/{endpoint.strip('/')}.parquet")
+                    if self.storage.exists(source, session_key_text):
+                        self._print_existing(source, session_key_text)
                         continue
 
-                    data = self.client.get_data(endpoint, params)
+                    data = self.client.get_data(
+                        endpoint,
+                        {"session_key": session_key},
+                    )
                     print(f"Data for endpoint {endpoint}: {data}")
+                    time.sleep(2)
 
-                    time.sleep(2)  # Sleep for 2 seconds between requests to avoid overwhelming the API
+                self.storage.save(source, session_key_text, data)
 
-                parquet_data = client_ingestion.process_data(data)
+            self.extract_car_data(session_key, drivers_numbers)
 
-                if parquet_data is not None:
-                    client_ingestion.save_data(parquet_data)
+    def extract_car_data(
+        self,
+        session_key: int,
+        drivers_numbers: list[int],
+    ) -> None:
+        session_key_text = str(session_key)
 
-            self.extractCarData(session_key, drivers_numbers)
-            
-    def extractCarData(self, session_key: int, drivers_numbers: list[int]):
-                endpoint = self.endpoint_car_data["car_data"]
-                for driver_number in drivers_numbers:
-                            client_ingestion = ingestion(
-                                source=f"car_data_driver={driver_number}",
-                                session_key=str(session_key),
-                            )
-                            if client_ingestion.file_exists():
-                                print(f"Car data already exists: session={session_key} | driver={driver_number}")
-                                continue
-                            data = self.client.get_data(endpoint,params={"session_key": session_key, "driver_number": driver_number})
-                            print(f"Car data | session={session_key} "f"| driver={driver_number} "f"| registros={len(data)}")
-                            parquet_data = client_ingestion.process_data(data)
-                            if parquet_data is not None:
-                                client_ingestion.save_data(parquet_data)
-                            time.sleep(3)  # Sleep for 3 seconds between requests to avoid overwhelming the API
-                            continue
+        for driver_number in drivers_numbers:
+            source = f"car_data_driver={driver_number}"
 
+            if self.storage.exists(source, session_key_text):
+                print(
+                    "Car data already exists: "
+                    f"session={session_key} | driver={driver_number}"
+                )
+                continue
 
+            data = self.client.get_data(
+                self.CAR_DATA_ENDPOINT,
+                {
+                    "session_key": session_key,
+                    "driver_number": driver_number,
+                },
+            )
+            print(
+                f"Car data | session={session_key} "
+                f"| driver={driver_number} | registros={len(data)}"
+            )
+            self.storage.save(source, session_key_text, data)
+            time.sleep(3)
 
-if __name__ == "__main__":
-    run = extractor(RequestFactory())
-    print(run.run_extraction())
+    @staticmethod
+    def _print_existing(source: str, session_key: str) -> None:
+        print(
+            f"Data already exists: session_key={session_key}/{source}.parquet"
+        )
