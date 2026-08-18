@@ -1,7 +1,0 @@
-Metadata-Version: 2.4
-Name: openf1-data-platform
-Version: 0.1.0
-Summary: Projeto de estudo para extração e processamento de dados da OpenF1
-Requires-Python: >=3.11
-Requires-Dist: pyarrow==25.0.1
-Requires-Dist: requests==2.34.2
