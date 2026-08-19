@@ -46,11 +46,7 @@ class DatabricksBronzeStorage(BronzeStorage):
         response.raise_for_status()
         return False
 
-    def save(
-        self,
-        source: str,
-        session_key: str,
-        data: list[dict],
+    def save(self,source: str,session_key: str, data: list[dict],
     ) -> None:
         dataframe = pd.DataFrame(data)
         if dataframe.empty:
