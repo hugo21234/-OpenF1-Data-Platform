@@ -5,6 +5,13 @@ import requests
 from dotenv import load_dotenv
 
 from bronze.contracts import BronzeStorage
+from bronze.validator.validator_car_data import ValidatorCarData
+from bronze.validator.validator_driver import ValidatorDriver
+from bronze.validator.validator_laps import ValidatorLaps
+from bronze.validator.validator_pit import ValidatorPit
+from bronze.validator.validator_position import ValidatorPosition
+from bronze.validator.validator_race_control import ValidatorRaceControl
+from bronze.validator.validator_stints import ValidatorStints
 
 
 class DatabricksBronzeStorage(BronzeStorage):
@@ -16,6 +23,15 @@ class DatabricksBronzeStorage(BronzeStorage):
         self.databricks_access_token = os.getenv("access_token")
         self.databricks_host = os.getenv("databricks_host")
         self.path_volume = os.getenv("path_volume_databricks")
+        self.validators = {
+            "drivers": ValidatorDriver(),
+            "laps": ValidatorLaps(),
+            "stints": ValidatorStints(),
+            "pit": ValidatorPit(),
+            "position": ValidatorPosition(),
+            "race_control": ValidatorRaceControl(),
+            "car_data": ValidatorCarData(),
+        }
 
         if not all(
             [
@@ -46,8 +62,25 @@ class DatabricksBronzeStorage(BronzeStorage):
         response.raise_for_status()
         return False
 
-    def save(self,source: str,session_key: str, data: list[dict],
+    def save(self,source: str,session_key: int, data: list[dict],
     ) -> None:
+        validator_source = (
+            "car_data" if source.startswith("car_data_driver=") else source
+        )
+        validator = self.validators.get(validator_source)
+        if validator is None:
+            print(f"No validator configured for source: {source}")
+            return
+
+        validation_passed, invalid_records = validator.validate(
+            data,
+            session_key,
+        )
+        if not validation_passed:
+            print("Validation failed. Invalid data found.")
+            print(f"Validation context: {invalid_records}")
+            return
+
         dataframe = pd.DataFrame(data)
         if dataframe.empty:
             print("No data to save.")
@@ -74,7 +107,7 @@ class DatabricksBronzeStorage(BronzeStorage):
         response.raise_for_status()
         print(f"Data saved to session_key={session_key}/{source}.parquet")
 
-    def _urls(self, source: str, session_key: str) -> tuple[str, str]:
+    def _urls(self, source: str, session_key: int | str) -> tuple[str, str]:
         directory_path = f"{self.path_volume}/session_key={session_key}/"
         directory_url = (
             f"{self.databricks_host}{self.directories_prefix}{directory_path}"

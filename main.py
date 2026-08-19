@@ -4,7 +4,7 @@ import requests
 
 from Request.OpenF1_Client import OpenF1Client
 from bronze.extrator.extractor import BronzeExtractor
-from bronze.ingestion.storage import DatabricksBronzeStorage
+from bronze.storage.databricks import DatabricksBronzeStorage
 
 
 def main() -> None:

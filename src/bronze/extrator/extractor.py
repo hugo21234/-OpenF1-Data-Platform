@@ -61,7 +61,7 @@ class BronzeExtractor(Extractor):
                     print(f"Data for endpoint {endpoint}: {data}")
                     time.sleep(2)
 
-                self.storage.save(source, session_key_text, data)
+                self.storage.save(source, session_key, data)
 
             self.extract_car_data(session_key, drivers_numbers)
 
@@ -93,7 +93,7 @@ class BronzeExtractor(Extractor):
                 f"Car data | session={session_key} "
                 f"| driver={driver_number} | registros={len(data)}"
             )
-            self.storage.save(source, session_key_text, data)
+            self.storage.save(source, session_key, data)
             time.sleep(3)
 
     @staticmethod
