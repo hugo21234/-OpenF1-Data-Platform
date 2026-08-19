@@ -3,6 +3,7 @@ import requests
 import pandas as pd
 from dotenv import load_dotenv
 
+from bronze.validator.validator_driver import ValidatorDriver
 from bronze.contracts import SaveTable
 
 class BronzeStorage(SaveTable):
@@ -13,6 +14,8 @@ class BronzeStorage(SaveTable):
         self.databricks_access_token = os.getenv("access_token")
         self.databricks_host = os.getenv("databricks_host")
         self.path_volume = os.getenv("path_volume_databricks")
+
+        self.validator_driver = ValidatorDriver()
         
         if not all(
             [
@@ -39,7 +42,14 @@ class BronzeStorage(SaveTable):
         
         directory_response = requests.put(directory_url,headers=headers,timeout=(60, 240))
         directory_response.raise_for_status()
-        
+
+        driver_validation, Session_Key_none, drivers_name_none = self.validator_driver.validate(data)
+        if not driver_validation :
+            print("Validation failed. Invalid data found.")
+            print(f"Session_Key_none: {Session_Key_none}")
+            print(f"drivers_name_none: {drivers_name_none}")
+            return
+
         response = requests.put(
                     file_url,
                     params={"overwrite": "false"},
@@ -66,56 +76,7 @@ class BronzeStorage(SaveTable):
     def _authorization_headers(self) -> dict[str, str]:
         return {"Authorization": f"Bearer {self.databricks_access_token}"}    
 
-    def validate(self, data: list[dict]) -> bool:
-
-        drivers_name_none = {}
-        Session_Key_none = {}
-
-        if not data:
-            print("No data to validate.")
-            return False
-        
-        for driver in data:
-
-           name = driver.get('full_name')  
-           driver_number = driver.get('driver_number')
-           Session_Key = driver.get('session_key')
-           meeting_key = driver.get('meeting_key')
-
-           if name is None or name.strip() == "" or not isinstance(name, str):
-                
-                print(f"Invalid driver name: {name}")
-
-                drivers_name_none['Number'] = driver.get('driver_number')
-                drivers_name_none['Session_Key'] = driver.get('session_key')
-
-                continue 
-           
-           if Session_Key is None or str(Session_Key).strip() == "":
-            
-                print(f"Invalid Session_Key: {Session_Key}")
-                Session_Key_none['Session_Key'] = driver.get('session_key')
-
-                continue
-
-           if meeting_key is None or str(meeting_key).strip() == "":
-            
-                print(f"Invalid meeting_key: {meeting_key}")
-                Session_Key_none['Session_Key'] = driver.get('session_key')
-
-                continue
-           if driver_number is None or str(driver_number).strip() == "":
-            
-                print(f"Invalid driver_number: {driver_number}")
-                Session_Key_none['Session_Key'] = driver.get('session_key')
-
-                continue   
-            
-           if drivers_name_none or Session_Key_none:
-                print("Validation failed. Invalid data found.")
-                return False
+    
 
 
-        return True
-
-    def transf
+    
