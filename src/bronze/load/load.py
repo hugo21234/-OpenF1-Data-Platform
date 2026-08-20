@@ -42,12 +42,8 @@ class BronzeStorage(SaveTable):
         ):
             raise ValueError("One or more required environment variables are missing.")
 
-    def save(
-        self,
-        source: str,
-        session_key: int,
-        data: list[dict],
-    ) -> None:
+    def save(self,source: str,session_key: int, data: list[dict]) -> None:
+        
         validator_source = (
             "car_data" if source.startswith("car_data_driver=") else source
         )

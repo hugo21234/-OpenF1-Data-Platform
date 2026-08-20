@@ -62,12 +62,13 @@ class DatabricksBronzeStorage(BronzeStorage):
         response.raise_for_status()
         return False
 
-    def save(self,source: str,session_key: int, data: list[dict],
-    ) -> None:
+    def save(self,source: str,session_key: int, data: list[dict]) -> None:
         validator_source = (
             "car_data" if source.startswith("car_data_driver=") else source
         )
+
         validator = self.validators.get(validator_source)
+
         if validator is None:
             print(f"No validator configured for source: {source}")
             return
@@ -76,17 +77,19 @@ class DatabricksBronzeStorage(BronzeStorage):
             data,
             session_key,
         )
+
         if not validation_passed:
             print("Validation failed. Invalid data found.")
             print(f"Validation context: {invalid_records}")
             return
 
         dataframe = pd.DataFrame(data)
+
         if dataframe.empty:
             print("No data to save.")
             return
 
-        parquet_data = dataframe.to_parquet(index=False)
+        
         directory_url, file_url = self._urls(source, session_key)
         headers = self._authorization_headers()
 
@@ -95,16 +98,19 @@ class DatabricksBronzeStorage(BronzeStorage):
             headers=headers,
             timeout=(60, 240),
         )
+
         directory_response.raise_for_status()
 
         response = requests.put(
             file_url,
             params={"overwrite": "false"},
-            data=parquet_data,
+            data=dataframe,
             headers={**headers, "Content-Type": "application/octet-stream"},
             timeout=(60, 240),
         )
+
         response.raise_for_status()
+        
         print(f"Data saved to session_key={session_key}/{source}.parquet")
 
     def _urls(self, source: str, session_key: int | str) -> tuple[str, str]:
