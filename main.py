@@ -3,8 +3,8 @@ import time
 import requests
 
 from Request.OpenF1_Client import OpenF1Client
-from bronze.extractor.extractor import BronzeExtractor
-from bronze.storage.volume import DatabricksVolumeStorage
+from bronze.extrator.extractor import BronzeExtractor
+from bronze.storage.databricks import DatabricksBronzeStorage
 
 
 def main() -> None:
@@ -14,7 +14,7 @@ def main() -> None:
     try:
         bronze_extractor = BronzeExtractor(
             client=OpenF1Client(),
-            storage=DatabricksVolumeStorage(),
+            storage=DatabricksBronzeStorage(),
         )
         bronze_extractor.run_extraction()
     except ValueError as error:

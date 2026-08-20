@@ -12,7 +12,7 @@ from bronze.validator.validator_race_control import ValidatorRaceControl
 from bronze.validator.validator_car_data import ValidatorCarData
 from bronze.contracts import SaveTable
 
-class DatabricksVolumeStorage(SaveTable):
+class BronzeStorage(SaveTable):
     def __init__(self) -> None:
         load_dotenv()
         self.files_prefix = os.getenv("prefix_databricks_files")
