@@ -4,7 +4,7 @@ import pandas as pd
 import requests
 from dotenv import load_dotenv
 
-from bronze.contracts import BronzeStorage
+from bronze.contracts import BronzeFileStorage
 from bronze.validator.validator_car_data import ValidatorCarData
 from bronze.validator.validator_driver import ValidatorDriver
 from bronze.validator.validator_laps import ValidatorLaps
@@ -14,7 +14,7 @@ from bronze.validator.validator_race_control import ValidatorRaceControl
 from bronze.validator.validator_stints import ValidatorStints
 
 
-class DatabricksBronzeStorage(BronzeStorage):
+class DatabricksTableLoader(BronzeFileStorage):
     def __init__(self) -> None:
         load_dotenv()
 
@@ -89,7 +89,6 @@ class DatabricksBronzeStorage(BronzeStorage):
             print("No data to save.")
             return
 
-        
         directory_url, file_url = self._urls(source, session_key)
         headers = self._authorization_headers()
 
@@ -110,7 +109,7 @@ class DatabricksBronzeStorage(BronzeStorage):
         )
 
         response.raise_for_status()
-        
+
         print(f"Data saved to session_key={session_key}/{source}.parquet")
 
     def _urls(self, source: str, session_key: int | str) -> tuple[str, str]:

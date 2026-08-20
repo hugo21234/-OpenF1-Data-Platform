@@ -1,7 +1,7 @@
 from abc import ABC, abstractmethod
 
 
-class BronzeStorage(ABC):
+class BronzeFileStorage(ABC):
     @abstractmethod
     def exists(self, source: str, session_key: str) -> bool:
         pass
@@ -27,4 +27,3 @@ class SaveTable(ABC):
         data: list[dict],
     ) -> None:
         pass
-
