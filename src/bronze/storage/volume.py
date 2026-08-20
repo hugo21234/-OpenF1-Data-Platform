@@ -4,7 +4,7 @@ import pandas as pd
 import requests
 from dotenv import load_dotenv
 
-from bronze.contracts import BronzeStorage
+from bronze.storage.contracts import VolumeStorage
 from bronze.validator.validator_car_data import ValidatorCarData
 from bronze.validator.validator_driver import ValidatorDriver
 from bronze.validator.validator_laps import ValidatorLaps
@@ -14,7 +14,7 @@ from bronze.validator.validator_race_control import ValidatorRaceControl
 from bronze.validator.validator_stints import ValidatorStints
 
 
-class DatabricksBronzeStorage(BronzeStorage):
+class DatabricksVolumeStorage(VolumeStorage):
     def __init__(self) -> None:
         load_dotenv()
 
@@ -62,11 +62,15 @@ class DatabricksBronzeStorage(BronzeStorage):
         response.raise_for_status()
         return False
 
-    def save(self,source: str,session_key: int, data: list[dict]) -> None:
+    def save(
+        self,
+        source: str,
+        session_key: int,
+        data: list[dict],
+    ) -> None:
         validator_source = (
             "car_data" if source.startswith("car_data_driver=") else source
         )
-
         validator = self.validators.get(validator_source)
 
         if validator is None:
@@ -89,7 +93,7 @@ class DatabricksBronzeStorage(BronzeStorage):
             print("No data to save.")
             return
 
-        
+        parquet_data = dataframe.to_parquet(index=False)
         directory_url, file_url = self._urls(source, session_key)
         headers = self._authorization_headers()
 
@@ -98,19 +102,17 @@ class DatabricksBronzeStorage(BronzeStorage):
             headers=headers,
             timeout=(60, 240),
         )
-
         directory_response.raise_for_status()
 
         response = requests.put(
             file_url,
             params={"overwrite": "false"},
-            data=dataframe,
+            data=parquet_data,
             headers={**headers, "Content-Type": "application/octet-stream"},
             timeout=(60, 240),
         )
-
         response.raise_for_status()
-        
+
         print(f"Data saved to session_key={session_key}/{source}.parquet")
 
     def _urls(self, source: str, session_key: int | str) -> tuple[str, str]:

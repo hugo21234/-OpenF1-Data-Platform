@@ -1,6 +1,7 @@
 import time
 
-from bronze.contracts import BronzeStorage, DataClient, Extractor
+from bronze.contracts import DataClient, Extractor
+from bronze.storage.contracts import VolumeStorage
 
 
 class BronzeExtractor(Extractor):
@@ -15,7 +16,7 @@ class BronzeExtractor(Extractor):
     SESSIONS_ENDPOINT = "/sessions"
     CAR_DATA_ENDPOINT = "/car_data"
 
-    def __init__(self, client: DataClient, storage: BronzeStorage) -> None:
+    def __init__(self, client: DataClient, storage: VolumeStorage) -> None:
         self.client = client
         self.storage = storage
 

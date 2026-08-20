@@ -1,30 +1,17 @@
 from abc import ABC, abstractmethod
 
 
-class BronzeStorage(ABC):
+class DataClient(ABC):
     @abstractmethod
-    def exists(self, source: str, session_key: str) -> bool:
-        pass
-
-    @abstractmethod
-    def save(
+    def get_data(
         self,
-        source: str,
-        session_key: int,
-        data: list[dict],
-    ) -> None:
+        endpoint: str,
+        params: dict | None = None,
+    ) -> list[dict]:
         pass
 
 
-class SaveTable(ABC):
-
-
+class Extractor(ABC):
     @abstractmethod
-    def save(
-        self,
-        source: str,
-        session_key: int,
-        data: list[dict],
-    ) -> None:
+    def run_extraction(self) -> None:
         pass
-
