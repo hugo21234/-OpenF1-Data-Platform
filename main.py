@@ -4,6 +4,7 @@ import requests
 
 from Request.OpenF1_Client import OpenF1Client
 from bronze.extractor.extractor import BronzeExtractor
+from bronze.load.table import DatabricksTableLoader
 from bronze.storage.volume import DatabricksVolumeStorage
 
 
@@ -15,6 +16,7 @@ def main() -> None:
         bronze_extractor = BronzeExtractor(
             client=OpenF1Client(),
             storage=DatabricksVolumeStorage(),
+            table_loader=DatabricksTableLoader(),
         )
         bronze_extractor.run_extraction()
     except ValueError as error:

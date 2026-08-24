@@ -23,6 +23,8 @@ class DatabricksVolumeStorage(VolumeStorage):
         self.databricks_access_token = os.getenv("access_token")
         self.databricks_host = os.getenv("databricks_host")
         self.path_volume = os.getenv("path_volume_databricks")
+        
+
         self.validators = {
             "drivers": ValidatorDriver(),
             "laps": ValidatorLaps(),
@@ -62,12 +64,7 @@ class DatabricksVolumeStorage(VolumeStorage):
         response.raise_for_status()
         return False
 
-    def save(
-        self,
-        source: str,
-        session_key: int,
-        data: list[dict],
-    ) -> None:
+    def save(self,source: str,session_key: int,data: list[dict] ) -> None:
         validator_source = (
             "car_data" if source.startswith("car_data_driver=") else source
         )
@@ -114,6 +111,8 @@ class DatabricksVolumeStorage(VolumeStorage):
         response.raise_for_status()
 
         print(f"Data saved to session_key={session_key}/{source}.parquet")
+
+        return  dataframe
 
     def _urls(self, source: str, session_key: int | str) -> tuple[str, str]:
         directory_path = f"{self.path_volume}/session_key={session_key}/"

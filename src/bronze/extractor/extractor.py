@@ -1,6 +1,7 @@
 import time
 
 from bronze.contracts import DataClient, Extractor
+from bronze.load.contracts import TableLoader
 from bronze.storage.contracts import VolumeStorage
 
 
@@ -16,9 +17,15 @@ class BronzeExtractor(Extractor):
     SESSIONS_ENDPOINT = "/sessions"
     CAR_DATA_ENDPOINT = "/car_data"
 
-    def __init__(self, client: DataClient, storage: VolumeStorage) -> None:
+    def __init__(
+        self,
+        client: DataClient,
+        storage: VolumeStorage,
+        table_loader: TableLoader,
+    ) -> None:
         self.client = client
         self.storage = storage
+        self.table_loader = table_loader
 
     def extract_sessions(self) -> list[dict]:
         return self.client.get_data(
@@ -49,10 +56,12 @@ class BronzeExtractor(Extractor):
                     ]
                     if self.storage.exists(source, session_key_text):
                         self._print_existing(source, session_key_text)
+                        self.table_loader.load(source, session_key)
                         continue
                 else:
                     if self.storage.exists(source, session_key_text):
                         self._print_existing(source, session_key_text)
+                        self.table_loader.load(source, session_key)
                         continue
 
                     data = self.client.get_data(
@@ -63,6 +72,7 @@ class BronzeExtractor(Extractor):
                     time.sleep(2)
 
                 self.storage.save(source, session_key, data)
+                self.table_loader.load(source, session_key)
 
             self.extract_car_data(session_key, drivers_numbers)
 
@@ -81,6 +91,7 @@ class BronzeExtractor(Extractor):
                     "Car data already exists: "
                     f"session={session_key} | driver={driver_number}"
                 )
+                self.table_loader.load(source, session_key)
                 continue
 
             data = self.client.get_data(
@@ -95,6 +106,7 @@ class BronzeExtractor(Extractor):
                 f"| driver={driver_number} | registros={len(data)}"
             )
             self.storage.save(source, session_key, data)
+            self.table_loader.load(source, session_key)
             time.sleep(3)
 
     @staticmethod
