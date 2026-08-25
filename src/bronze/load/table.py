@@ -41,7 +41,26 @@ class DatabricksTableLoader(TableLoader):
             )
 
     def exists(self, source: str, session_key: int) -> bool:
+        file_count, table_count = self._record_counts(source, session_key)
+        return file_count > 0 and table_count == file_count
+
+    def _record_counts(
+        self,
+        source: str,
+        session_key: int,
+    ) -> tuple[int, int]:
         table_name, driver_number = self._source_data(source)
+        file_path = (
+            f"{self.path_volume.rstrip('/')}"
+            f"/session_key={session_key}/{source}.parquet"
+        )
+        file_statement = f"""
+            SELECT COUNT(*)
+            FROM read_files('{file_path}', format => 'parquet')
+        """
+        file_result = self._execute_statement(file_statement)
+        file_count = int(file_result["result"]["data_array"][0][0])
+
         filters = ["session_key = :session_key"]
         parameters = [
             {
@@ -62,12 +81,12 @@ class DatabricksTableLoader(TableLoader):
             )
 
         statement = f"""
-            SELECT 1 FROM {table_name}
+            SELECT COUNT(*) FROM {table_name}
             WHERE {' AND '.join(filters)}
-            LIMIT 1
         """
-        result = self._execute(statement, parameters)
-        return bool(result.get("result", {}).get("data_array"))
+        result = self._execute_statement(statement, parameters)
+        table_count = int(result["result"]["data_array"][0][0])
+        return file_count, table_count
 
     def load(self, source: str, session_key: int) -> None:
         table_name, _ = self._source_data(source)
@@ -83,12 +102,45 @@ class DatabricksTableLoader(TableLoader):
             f"{self.path_volume.rstrip('/')}/"
             f"session_key={session_key}/{source}.parquet"
         )
-        statement = f"""
-            COPY INTO {table_name}
-            FROM '{file_path}'
-            FILEFORMAT = PARQUET
-        """
-        self._execute(statement)
+        if source == "laps":
+            statement = f"""
+                COPY INTO {table_name}
+                FROM (
+                    SELECT
+                        meeting_key,
+                        session_key,
+                        driver_number,
+                        lap_number,
+                        date_start,
+                        duration_sector_1,
+                        duration_sector_2,
+                        duration_sector_3,
+                        CAST(i1_speed AS DOUBLE) AS i1_speed,
+                        CAST(i2_speed AS DOUBLE) AS i2_speed,
+                        is_pit_out_lap,
+                        lap_duration,
+                        segments_sector_1,
+                        segments_sector_2,
+                        segments_sector_3,
+                        CAST(st_speed AS DOUBLE) AS st_speed
+                    FROM '{file_path}'
+                )
+                FILEFORMAT = PARQUET
+            """
+        else:
+            statement = f"""
+                COPY INTO {table_name}
+                FROM '{file_path}'
+                FILEFORMAT = PARQUET
+            """
+        self._execute_statement(statement)
+
+        file_count, table_count = self._record_counts(source, session_key)
+        if file_count == 0 or table_count != file_count:
+            raise ValueError(
+                "Load validation failed: "
+                f"file_count={file_count} | table_count={table_count}"
+            )
 
         print(
             f"Data loaded to table={table_name} "
@@ -110,7 +162,11 @@ class DatabricksTableLoader(TableLoader):
         table_name = self.FILE_TO_TABLE_MAP.get(source, source)
         return f"{self.TABLE_SCHEMA}.{table_name}", None
 
-    def _execute(self,statement: str,parameters: list[dict[str, str]] | None = None) -> dict:
+    def _execute_statement(
+        self,
+        statement: str,
+        parameters: list[dict[str, str]] | None = None,
+    ) -> dict:
         payload = {
             "warehouse_id": self.warehouse_id,
             "statement": statement,

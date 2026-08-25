@@ -3,8 +3,8 @@ CREATE TABLE stints (
     driver_number BIGINT,
     lap_end BIGINT,
     lap_start BIGINT,
-    meeting_key BIGINT,
-    session_key BIGINT,
+    meeting_key INT,
+    session_key INT,
     stint_number BIGINT,
     tyre_age_at_start BIGINT
 )

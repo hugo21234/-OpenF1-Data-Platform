@@ -6,8 +6,8 @@ CREATE TABLE drivers (
     last_name STRING,
     headshot_url STRING,
     full_name STRING,
-    meeting_key BIGINT,
-    session_key BIGINT,
+    meeting_key INT,
+    session_key INT,
     name_acronym STRING,
     team_colour STRING,
     team_name STRING
