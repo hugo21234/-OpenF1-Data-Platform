@@ -5,7 +5,7 @@ from bronze.load.contracts import TableLoader
 from bronze.storage.contracts import VolumeStorage
 
 
-class BronzeExtractor(Extractor):
+class BronzePipeline(Extractor):
     ENDPOINTS = (
         "/drivers",
         "/laps",
@@ -22,10 +22,12 @@ class BronzeExtractor(Extractor):
         client: DataClient,
         storage: VolumeStorage,
         table_loader: TableLoader,
+        endpoints: tuple[str, ...] = ENDPOINTS,
     ) -> None:
         self.client = client
         self.storage = storage
         self.table_loader = table_loader
+        self.endpoint = endpoints
 
     def extract_sessions(self) -> list[dict]:
         return self.client.get_data(

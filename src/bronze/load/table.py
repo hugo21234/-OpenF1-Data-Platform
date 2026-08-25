@@ -8,6 +8,8 @@ from bronze.load.contracts import TableLoader
 
 
 class DatabricksTableLoader(TableLoader):
+    TABLE_SCHEMA = "f1_plataform_data.bronze"
+    FILE_TO_TABLE_MAP = {"pit": "pits"}
     SOURCES = {
         "drivers",
         "laps",
@@ -100,12 +102,13 @@ class DatabricksTableLoader(TableLoader):
             if not driver_number_text.isdigit():
                 raise ValueError(f"Invalid car data source: {source}")
 
-            return "car_data", int(driver_number_text)
+            return f"{self.TABLE_SCHEMA}.car_data", int(driver_number_text)
 
         if source not in self.SOURCES:
             raise ValueError(f"Invalid source: {source}")
 
-        return source, None
+        table_name = self.FILE_TO_TABLE_MAP.get(source, source)
+        return f"{self.TABLE_SCHEMA}.{table_name}", None
 
     def _execute(self,statement: str,parameters: list[dict[str, str]] | None = None) -> dict:
         payload = {

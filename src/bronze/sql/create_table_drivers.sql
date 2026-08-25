@@ -1,13 +1,14 @@
 CREATE TABLE drivers (
-    broadcast_nama STRING,
-    driver_number STRING,
+    broadcast_name STRING,
+    country_code INT,
+    driver_number BIGINT,
     first_name STRING,
     last_name STRING,
     headshot_url STRING,
     full_name STRING,
-    meeting_key INT,
-    session_key INT,
+    meeting_key BIGINT,
+    session_key BIGINT,
     name_acronym STRING,
-    team_color STRING,
+    team_colour STRING,
     team_name STRING
 )
