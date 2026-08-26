@@ -48,33 +48,35 @@ class BronzePipeline(Extractor):
             for endpoint in self.ENDPOINTS:
                 source = endpoint.strip("/")
 
-                if endpoint == "/drivers":
-                    data = self.client.get_data(
-                        endpoint,
-                        {"session_key": session_key},
-                    )
-                    drivers_numbers = [
-                        driver["driver_number"] for driver in data
-                    ]
-                    if self.storage.exists(source, session_key_text):
-                        self._print_existing(source, session_key_text)
-                        continue
+                if endpoint == "/drivers": 
+                        data = self.client.get_data( 
+                            endpoint, 
+                            {"session_key": session_key}, 
+                        ) 
+                        drivers_numbers = [ 
+                            driver["driver_number"] for driver in data 
+                        ] 
+             
+                    
+
+                if self.storage.exists(source, session_key) is True:
+                    self._print_existing(source, session_key)
+                    
                 else:
-                    if self.table_loader.exists(source, session_key_text):
-                        self._print_existing(source, session_key_text)
-                        continue
+                    data = self.client.get_data(endpoint,{"session_key": session_key})
+                    self.storage.save(source, session_key, data)
+                    print(f"Data for endpoint {endpoint}: {data}")
+                    time.sleep(2)
 
-                self.storage.save(source, session_key, data)
-                self.table_loader.load(source, session_key)    
-                data = self.client.get_data(endpoint,
-                        {"session_key": session_key},
-                    )
-                print(f"Data for endpoint {endpoint}: {data}")
-                time.sleep(2)
-
-                self.storage.save(source, session_key, data)
-                self.table_loader.load(source, session_key)
-
+                if self.table_loader.exists(source, session_key) is True:
+                    self._print_existing(source, session_key)
+                    print(f"Data for endpoint {endpoint}: {data}")
+                    
+                else:
+                    self.table_loader.load(source, session_key)  
+                continue
+                    
+                
             self.extract_car_data(session_key, drivers_numbers)
 
     def extract_car_data(self,session_key: int,drivers_numbers: list[int]) -> None:
@@ -83,13 +85,23 @@ class BronzePipeline(Extractor):
         for driver_number in drivers_numbers:
             source = f"car_data_driver={driver_number}"
 
-            if self.storage.exists(source, session_key_text):
+            if self.storage.exists(source, session_key) is True:
+
                 print(
-                    "Car data already exists: "
+                    "This volume Car data already exists: "
                     f"session={session_key} | driver={driver_number}"
                 )
-            if self.table_loader.exists(source, session_key):
-                print("Car data already exists: " f"session={session_key} | driver={driver_number}")
+
+                if self.table_loader.exists(source, session_key) is False:
+                    self.table_loader.load(source, session_key)
+
+                else:
+                    print(
+                        "Car data already exists in the table: "
+                        f"session={session_key} | driver={driver_number}"
+                    )
+
+            
                 continue
 
 
@@ -100,12 +112,12 @@ class BronzePipeline(Extractor):
                     "driver_number": driver_number,
                 },
             )
-            print(
-                f"Car data | session={session_key} "
-                f"| driver={driver_number} | registros={len(data)}"
-            )
+
+            print(f"Car data | session={session_key} "f"| driver={driver_number} | registros={len(data)}")
+
             self.storage.save(source, session_key, data)
             self.table_loader.load(source, session_key)
+
             time.sleep(3)
 
     @staticmethod

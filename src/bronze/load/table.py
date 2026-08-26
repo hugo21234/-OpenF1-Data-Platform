@@ -41,26 +41,7 @@ class DatabricksTableLoader(TableLoader):
             )
 
     def exists(self, source: str, session_key: int) -> bool:
-        file_count, table_count = self._record_counts(source, session_key)
-        return file_count > 0 and table_count == file_count
-
-    def _record_counts(
-        self,
-        source: str,
-        session_key: int,
-    ) -> tuple[int, int]:
         table_name, driver_number = self._source_data(source)
-        file_path = (
-            f"{self.path_volume.rstrip('/')}"
-            f"/session_key={session_key}/{source}.parquet"
-        )
-        file_statement = f"""
-            SELECT COUNT(*)
-            FROM read_files('{file_path}', format => 'parquet')
-        """
-        file_result = self._execute_statement(file_statement)
-        file_count = int(file_result["result"]["data_array"][0][0])
-
         filters = ["session_key = :session_key"]
         parameters = [
             {
@@ -81,12 +62,12 @@ class DatabricksTableLoader(TableLoader):
             )
 
         statement = f"""
-            SELECT COUNT(*) FROM {table_name}
+            SELECT 1 FROM {table_name}
             WHERE {' AND '.join(filters)}
+            LIMIT 1
         """
         result = self._execute_statement(statement, parameters)
-        table_count = int(result["result"]["data_array"][0][0])
-        return file_count, table_count
+        return bool(result.get("result", {}).get("data_array"))
 
     def load(self, source: str, session_key: int) -> None:
         table_name, _ = self._source_data(source)
@@ -134,13 +115,6 @@ class DatabricksTableLoader(TableLoader):
                 FILEFORMAT = PARQUET
             """
         self._execute_statement(statement)
-
-        file_count, table_count = self._record_counts(source, session_key)
-        if file_count == 0 or table_count != file_count:
-            raise ValueError(
-                "Load validation failed: "
-                f"file_count={file_count} | table_count={table_count}"
-            )
 
         print(
             f"Data loaded to table={table_name} "
