@@ -58,31 +58,26 @@ class BronzePipeline(Extractor):
                     ]
                     if self.storage.exists(source, session_key_text):
                         self._print_existing(source, session_key_text)
-                        self.table_loader.load(source, session_key)
                         continue
                 else:
-                    if self.storage.exists(source, session_key_text):
+                    if self.table_loader.exists(source, session_key_text):
                         self._print_existing(source, session_key_text)
-                        self.table_loader.load(source, session_key)
                         continue
 
-                    data = self.client.get_data(
-                        endpoint,
+                self.storage.save(source, session_key, data)
+                self.table_loader.load(source, session_key)    
+                data = self.client.get_data(endpoint,
                         {"session_key": session_key},
                     )
-                    print(f"Data for endpoint {endpoint}: {data}")
-                    time.sleep(2)
+                print(f"Data for endpoint {endpoint}: {data}")
+                time.sleep(2)
 
                 self.storage.save(source, session_key, data)
                 self.table_loader.load(source, session_key)
 
             self.extract_car_data(session_key, drivers_numbers)
 
-    def extract_car_data(
-        self,
-        session_key: int,
-        drivers_numbers: list[int],
-    ) -> None:
+    def extract_car_data(self,session_key: int,drivers_numbers: list[int]) -> None:
         session_key_text = str(session_key)
 
         for driver_number in drivers_numbers:
@@ -93,8 +88,10 @@ class BronzePipeline(Extractor):
                     "Car data already exists: "
                     f"session={session_key} | driver={driver_number}"
                 )
-                self.table_loader.load(source, session_key)
+            if self.table_loader.exists(source, session_key):
+                print("Car data already exists: " f"session={session_key} | driver={driver_number}")
                 continue
+
 
             data = self.client.get_data(
                 self.CAR_DATA_ENDPOINT,
