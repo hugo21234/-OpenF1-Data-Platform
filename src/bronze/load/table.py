@@ -1,10 +1,9 @@
 import os
-import time
 
-import requests
 from dotenv import load_dotenv
 
 from bronze.load.contracts import TableLoader
+from bronze.verification.loadVerifier import LoadVerifier
 
 
 class DatabricksTableLoader(TableLoader):
@@ -23,51 +22,17 @@ class DatabricksTableLoader(TableLoader):
     def __init__(self) -> None:
         load_dotenv()
 
-        self.databricks_access_token = os.getenv("access_token")
-        self.databricks_host = os.getenv("databricks_host")
         self.path_volume = os.getenv("path_volume_databricks")
-        self.warehouse_id = os.getenv("warehouse_id")
+        self.verifier = LoadVerifier()
 
-        if not all(
-            [
-                self.databricks_access_token,
-                self.databricks_host,
-                self.path_volume,
-                self.warehouse_id,
-            ]
-        ):
+        if not self.path_volume:
             raise ValueError(
                 "One or more required environment variables are missing."
             )
 
     def exists(self, source: str, session_key: int) -> bool:
         table_name, driver_number = self._source_data(source)
-        filters = ["session_key = :session_key"]
-        parameters = [
-            {
-                "name": "session_key",
-                "type": "INT",
-                "value": str(session_key),
-            }
-        ]
-
-        if driver_number is not None:
-            filters.append("driver_number = :driver_number")
-            parameters.append(
-                {
-                    "name": "driver_number",
-                    "type": "INT",
-                    "value": str(driver_number),
-                }
-            )
-
-        statement = f"""
-            SELECT 1 FROM {table_name}
-            WHERE {' AND '.join(filters)}
-            LIMIT 1
-        """
-        result = self._execute_statement(statement, parameters)
-        return bool(result.get("result", {}).get("data_array"))
+        return self.verifier.exists(table_name, driver_number, session_key)
 
     def load(self, source: str, session_key: int) -> None:
         table_name, _ = self._source_data(source)
@@ -114,7 +79,7 @@ class DatabricksTableLoader(TableLoader):
                 FROM '{file_path}'
                 FILEFORMAT = PARQUET
             """
-        self._execute_statement(statement)
+        self.verifier.execute_statement(statement)
 
         print(
             f"Data loaded to table={table_name} "
@@ -135,59 +100,3 @@ class DatabricksTableLoader(TableLoader):
 
         table_name = self.FILE_TO_TABLE_MAP.get(source, source)
         return f"{self.TABLE_SCHEMA}.{table_name}", None
-
-    def _execute_statement(
-        self,
-        statement: str,
-        parameters: list[dict[str, str]] | None = None,
-    ) -> dict:
-        payload = {
-            "warehouse_id": self.warehouse_id,
-            "statement": statement,
-            "wait_timeout": "50s",
-            "on_wait_timeout": "CONTINUE",
-        }
-
-        if parameters:
-            payload["parameters"] = parameters
-
-        response = requests.post(
-            self._url(),
-            headers=self._authorization_headers(),
-            json=payload,
-            timeout=(60, 240),
-        )
-        response.raise_for_status()
-        result = response.json()
-
-        while result.get("status", {}).get("state") in {
-            "PENDING",
-            "RUNNING",
-        }:
-            
-            time.sleep(2)
-            statement_id = result["statement_id"]
-            response = requests.get(
-                f"{self._url()}/{statement_id}",
-                headers=self._authorization_headers(),
-                timeout=(60, 240),
-            )
-            response.raise_for_status()
-            result = response.json()
-
-        state = result.get("status", {}).get("state")
-        if state != "SUCCEEDED":
-            error = result.get("status", {}).get("error", {})
-            message = error.get("message", "Databricks statement failed.")
-            raise ValueError(message)
-
-        return result
-
-    def _url(self) -> str:
-        return f"{self.databricks_host.rstrip('/')}/api/2.0/sql/statements"
-
-    def _authorization_headers(self) -> dict[str, str]:
-        return {
-            "Authorization": f"Bearer {self.databricks_access_token}",
-            "Content-Type": "application/json",
-        }

@@ -5,13 +5,7 @@ import requests
 from dotenv import load_dotenv
 
 from bronze.storage.contracts import VolumeStorage
-from bronze.validator.validator_car_data import ValidatorCarData
-from bronze.validator.validator_driver import ValidatorDriver
-from bronze.validator.validator_laps import ValidatorLaps
-from bronze.validator.validator_pit import ValidatorPit
-from bronze.validator.validator_position import ValidatorPosition
-from bronze.validator.validator_race_control import ValidatorRaceControl
-from bronze.validator.validator_stints import ValidatorStints
+from bronze.validator.validator import REQUIRED_FIELDS, Validator
 
 
 class DatabricksVolumeStorage(VolumeStorage):
@@ -112,15 +106,7 @@ class DatabricksVolumeStorage(VolumeStorage):
         self.path_volume = os.getenv("path_volume_databricks")
         
 
-        self.validators = {
-            "drivers": ValidatorDriver(),
-            "laps": ValidatorLaps(),
-            "stints": ValidatorStints(),
-            "pit": ValidatorPit(),
-            "position": ValidatorPosition(),
-            "race_control": ValidatorRaceControl(),
-            "car_data": ValidatorCarData(),
-        }
+        self.validator = Validator()
 
         if not all(
             [
@@ -155,15 +141,14 @@ class DatabricksVolumeStorage(VolumeStorage):
         validator_source = (
             "car_data" if source.startswith("car_data_driver=") else source
         )
-        validator = self.validators.get(validator_source)
-
-        if validator is None:
+        if validator_source not in REQUIRED_FIELDS:
             print(f"No validator configured for source: {source}")
             return
 
-        validation_passed, invalid_records = validator.validate(
+        validation_passed, invalid_records = self.validator.validate(
             data,
             session_key,
+            validator_source,
         )
 
         if not validation_passed:
