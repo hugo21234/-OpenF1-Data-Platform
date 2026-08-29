@@ -1,6 +1,11 @@
+import os
+import sys
 import time
 
 import requests
+
+# Ensure src/ is in path when running as a Job (Git checkout doesn't auto-add it)
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), "src"))
 
 from Request.OpenF1_Client import OpenF1Client
 from bronze.extractor.extractor import BronzePipeline
