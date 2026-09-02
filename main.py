@@ -29,7 +29,7 @@ os.environ.setdefault("path_volume_databricks", "/Volumes/f1_plataform_data/bron
 os.environ.setdefault("prefix_databricks_files", "/api/2.0/fs/files")
 os.environ.setdefault("prefix_databricks", "/api/2.0/fs/directories")
 
-from Request.OpenF1_Client import OpenF1Client
+from clients.openf1 import OpenF1Client
 from bronze.extractor.extractor import BronzePipeline
 from bronze.load.table import DatabricksTableLoader
 from bronze.storage.volume import DatabricksVolumeStorage
@@ -37,7 +37,7 @@ from bronze.storage.volume import DatabricksVolumeStorage
 
 def main() -> None:
     started_at = time.perf_counter()
-    
+
     print("Iniciando teste da camada Bronze...")
 
     try:
@@ -51,7 +51,7 @@ def main() -> None:
     except ValueError as error:
         print(f"Erro de configuração: {error}")
         raise
-    
+
     except requests.exceptions.RequestException as error:
         print(f"Erro de comunicação com OpenF1 ou Databricks: {error}")
         raise
