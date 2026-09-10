@@ -4,7 +4,7 @@
 CREATE SCHEMA IF NOT EXISTS f1_plataform_data.silver;
 
 CREATE OR REPLACE TABLE f1_plataform_data.silver.drivers AS
-SELECT
+SELECT DISTINCT
     meeting_key,
     session_key,
     TRY_CAST(driver_number AS int) AS driver_number,
@@ -19,7 +19,7 @@ SELECT
 FROM (
     SELECT *,
         ROW_NUMBER() OVER (
-            PARTITION BY session_key, driver_number
+            PARTITION BY full_name, team_name
             ORDER BY meeting_key DESC
         ) AS rn
     FROM f1_plataform_data.bronze.drivers
