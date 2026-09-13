@@ -17,6 +17,8 @@ class DatabricksTableLoader(TableLoader):
         "position",
         "race_control",
         "car_data",
+        "meetings",
+        "sessions"
     }
 
     def __init__(self) -> None:
@@ -30,24 +32,26 @@ class DatabricksTableLoader(TableLoader):
                 "One or more required environment variables are missing."
             )
 
-    def exists(self, source: str, session_key: int) -> bool:
+
+    def exists(self, source: str, meeting_key: int | None,
+               session_key: int | None) -> bool:
         table_name, driver_number = self._source_data(source)
-        return self.verifier.exists(table_name, driver_number, session_key)
+        if meeting_key is None:
+            raise ValueError("meeting_key cannot be None.")
+        if source != "meetings" and session_key is None:
+            raise ValueError("session_key is required for session data.")
+        return self.verifier.exists(table_name, driver_number, meeting_key, session_key)
 
-    def load(self, source: str, session_key: int) -> None:
+    def load(self, source: str, meeting_key: int | None,
+             session_key: int | None) -> None:
         table_name, _ = self._source_data(source)
-
-        if self.exists(source, session_key):
-            print(
-                f"Data already loaded: table={table_name} "
-                f"| session_key={session_key} | source={source}"
-            )
+        if self.exists(source, meeting_key, session_key):
             return
+        directory = f"{self.path_volume.rstrip('/')}/meeting_key={meeting_key}"
+        if session_key is not None:
+            directory += f"/session_key={session_key}"
+        file_path = f"{directory}/{source}.parquet"
 
-        file_path = (
-            f"{self.path_volume.rstrip('/')}/"
-            f"session_key={session_key}/{source}.parquet"
-        )
         if source == "laps":
             statement = f"""
                 COPY INTO {table_name}
@@ -83,7 +87,7 @@ class DatabricksTableLoader(TableLoader):
 
         print(
             f"Data loaded to table={table_name} "
-            f"| session_key={session_key} | source={source}"
+            f"| meeting_key={meeting_key} | session_key={session_key} | source={source}"
         )
 
     def _source_data(self, source: str) -> tuple[str, int | None]:

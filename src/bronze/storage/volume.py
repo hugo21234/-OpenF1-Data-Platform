@@ -158,7 +158,7 @@ class DatabricksVolumeStorage(VolumeStorage):
                 "One or more required environment variables are missing."
             )
 
-    def exists(self, source: str, session_key: str | None , meeting_key: str | None) -> bool:
+    def exists(self, source: str, session_key: int | None, meeting_key: int) -> bool:
         _, file_url = self._urls(source, session_key,meeting_key)
         response = requests.head(
             file_url,
@@ -174,7 +174,7 @@ class DatabricksVolumeStorage(VolumeStorage):
         response.raise_for_status()
         return False
 
-    def save(self,source: str,session_key: int | None, meeting_key: str | None, data: list[dict] ) -> None:
+    def save(self,source: str,session_key: int | None, meeting_key: int, data: list[dict] ) -> None:
         validator_source = (
             "car_data" if source.startswith("car_data_driver=") else source
         )
@@ -185,8 +185,8 @@ class DatabricksVolumeStorage(VolumeStorage):
         validation_passed, invalid_records = self.validator.validate(
             data,
             session_key,
-            meeting_key,
             validator_source,
+            expected_meeting=meeting_key,
         )
 
         if not validation_passed:
@@ -225,7 +225,7 @@ class DatabricksVolumeStorage(VolumeStorage):
 
         print(f"Data saved to session_key={session_key}/{source}.parquet")
 
-        return  dataframe
+        return
 
     @classmethod
     def _apply_sql_types(
@@ -279,11 +279,11 @@ class DatabricksVolumeStorage(VolumeStorage):
         
         if session_key is None:
         
-                directory_path = f"{self.path_volume}/meeting_key={meeting_key}/"
+                directory_path = f"{self.path_volume.rstrip('/')}/meeting_key={meeting_key}/"
         
         else:
 
-            directory_path = f"{self.path_volume}/meeting_key={meeting_key}/session_key={session_key}/"
+            directory_path = f"{self.path_volume.rstrip('/')}/meeting_key={meeting_key}/session_key={session_key}/"
 
         directory_url = (
             f"{self.databricks_host}{self.directories_prefix}{directory_path}"

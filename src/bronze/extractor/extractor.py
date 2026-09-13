@@ -1,4 +1,5 @@
 import time
+from datetime import datetime, timezone
 
 from bronze.contracts import DataClient, Extractor
 from bronze.load.contracts import TableLoader
@@ -6,16 +7,16 @@ from bronze.storage.contracts import VolumeStorage
 
 
 class BronzePipeline(Extractor):
-    ENDPOINTS = (
+    MEETINGS_ENDPOINT = "/meetings"
+    SESSIONS_ENDPOINT = "/sessions"
+    SESSION_ENDPOINTS = (
         "/drivers",
         "/laps",
         "/stints",
         "/pit",
         "/position",
         "/race_control",
-        "/meetings",
     )
-    SESSIONS_ENDPOINT = "/sessions"
     CAR_DATA_ENDPOINT = "/car_data"
 
     def __init__(
@@ -23,7 +24,7 @@ class BronzePipeline(Extractor):
         client: DataClient,
         storage: VolumeStorage,
         table_loader: TableLoader,
-        endpoints: tuple[str, ...] = ENDPOINTS,
+        endpoints: tuple[str, ...] = SESSION_ENDPOINTS,
     ) -> None:
         self.client = client
         self.storage = storage
@@ -31,98 +32,108 @@ class BronzePipeline(Extractor):
         self.endpoint = endpoints
 
     def extract_sessions(self) -> list[dict]:
-        return self.client.get_data(
+        sessions = self.client.get_data(
             self.SESSIONS_ENDPOINT,
-            params={
-                "year": time.localtime().tm_year,
-                "session_name": "Race",
-                "is_cancelled": False,
-            },
+            params={"year": time.localtime().tm_year},
         )
+        time.sleep(2)
+        now = datetime.now(timezone.utc)
+        completed_sessions = []
+        for session in sessions:
+            if session.get("session_type") not in {"Practice", "Qualifying", "Race"}:
+                continue
+            if "sprint" in session.get("session_name", "").lower():
+                continue
+            if session.get("is_cancelled"):
+                continue
+            try:
+                date_end = datetime.fromisoformat(session["date_end"])
+            except (KeyError, TypeError, ValueError):
+                continue
+            # Without a timezone, completion cannot be established reliably.
+            if date_end.tzinfo is None or date_end >= now:
+                continue
+            completed_sessions.append(session)
+        return completed_sessions
 
     def run_extraction(self) -> None:
+        processed_meetings: set[int] = set()
         for session in self.extract_sessions():
+            meeting_key = session["meeting_key"]
             session_key = session["session_key"]
-            session_key_text = str(session_key)
+
+            if meeting_key not in processed_meetings:
+                meetings = self.client.get_data(
+                    self.MEETINGS_ENDPOINT, {"meeting_key": meeting_key}
+                )
+                time.sleep(2)
+                if not meetings:
+                    raise ValueError(f"Meeting {meeting_key} was not returned by OpenF1.")
+                self._save_and_load("meetings", meeting_key, None, meetings)
+                processed_meetings.add(meeting_key)
+
+            self._save_and_load("sessions", meeting_key, session_key, [session])
             drivers_numbers: list[int] = []
-
-            for endpoint in self.ENDPOINTS:
-                source = endpoint.strip("/")
-
-                if endpoint == "/drivers": 
-                        data = self.client.get_data( 
-                            endpoint, 
-                            {"session_key": session_key}, 
-                        ) 
-                        drivers_numbers = [ 
-                            driver["driver_number"] for driver in data 
-                        ] 
-             
-                    
-
-                if self.storage.exists(source, session_key) is True:
-                    self._print_existing(source, session_key)
-                    
-                else:
-                    data = self.client.get_data(endpoint,{"session_key": session_key})
-                    self.storage.save(source, session_key, data)
-                    print(f"Data for endpoint {endpoint}: {data}")
-                    time.sleep(2)
-
-                if self.table_loader.exists(source, session_key) is True:
-                    self._print_existing(source, session_key)
-                    print(f"Data for endpoint {endpoint}: {data}")
-                    
-                else:
-                    self.table_loader.load(source, session_key)  
-                continue
-                    
-                
-            self.extract_car_data(session_key, drivers_numbers)
-
-    def extract_car_data(self,session_key: int,drivers_numbers: list[int]) -> None:
-        session_key_text = str(session_key)
-
-        for driver_number in drivers_numbers:
-            source = f"car_data_driver={driver_number}"
-
-            if self.storage.exists(source, session_key) is True:
-
-                print(
-                    "This volume Car data already exists: "
-                    f"session={session_key} | driver={driver_number}"
+            for endpoint in self.endpoint:
+                data = self.client.get_data(endpoint, {"session_key": session_key})
+                time.sleep(2)
+                if endpoint == "/drivers":
+                    drivers_numbers = [driver["driver_number"] for driver in data]
+                self._save_and_load(
+                    endpoint.strip("/"), meeting_key, session_key, data
                 )
 
-                if self.table_loader.exists(source, session_key) is False:
-                    self.table_loader.load(source, session_key)
+            self.extract_car_data(meeting_key, session_key, drivers_numbers)
 
-                else:
-                    print(
-                        "Car data already exists in the table: "
-                        f"session={session_key} | driver={driver_number}"
-                    )
+    def _save_and_load(
+        self,
+        source: str,
+        meeting_key: int,
+        session_key: int | None,
+        data: list[dict],
+    ) -> None:
+        if self.storage.exists(
+            source=source, meeting_key=meeting_key, session_key=session_key
+        ):
+            self._print_existing(source, meeting_key, session_key)
+        elif data:
+            self.storage.save(
+                source=source, meeting_key=meeting_key,
+                session_key=session_key, data=data,
+            )
+        else:
+            # Storage does not create a parquet file for an empty response.
+            return
+        self.table_loader.load(
+            source=source, meeting_key=meeting_key, session_key=session_key
+        )
 
-            
+    def extract_car_data(
+        self, meeting_key: int, session_key: int, drivers_numbers: list[int]
+    ) -> None:
+        for driver_number in drivers_numbers:
+            source = f"car_data_driver={driver_number}"
+            if self.storage.exists(
+                source=source, meeting_key=meeting_key, session_key=session_key
+            ):
+                self._print_existing(source, meeting_key, session_key)
+                self.table_loader.load(
+                    source=source, meeting_key=meeting_key, session_key=session_key
+                )
                 continue
-
 
             data = self.client.get_data(
                 self.CAR_DATA_ENDPOINT,
-                {
-                    "session_key": session_key,
-                    "driver_number": driver_number,
-                },
+                {"session_key": session_key, "driver_number": driver_number},
             )
-
-            print(f"Car data | session={session_key} "f"| driver={driver_number} | registros={len(data)}")
-
-            self.storage.save(source, session_key, data)
-            self.table_loader.load(source, session_key)
-
             time.sleep(3)
+            self._save_and_load(source, meeting_key, session_key, data)
 
     @staticmethod
-    def _print_existing(source: str, session_key: str) -> None:
-        print(
-            f"Data already exists: session_key={session_key}/{source}.parquet"
-        )
+    def _print_existing(
+        source: str, meeting_key: int, session_key: int | None
+    ) -> None:
+        directory = f"meeting_key={meeting_key}"
+        if session_key is not None:
+            directory += f"/session_key={session_key}"
+        print(f"Data already exists: {directory}/{source}.parquet")

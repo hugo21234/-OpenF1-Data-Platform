@@ -1,4 +1,6 @@
 REQUIRED_FIELDS: dict[str, tuple[str, ...]] = {
+    "meetings": ("meeting_key",),
+    "sessions": ("meeting_key", "session_key"),
     "drivers": (
         "session_key",
         "meeting_key",
@@ -53,8 +55,9 @@ class Validator:
     def validate(
         self,
         data: list[dict],
-        expected_session: int | str,
+        expected_session: int | str | None,
         source: str,
+        expected_meeting: int | str | None = None,
     ) -> tuple[bool, list[dict[str, object]]]:
         required_fields = REQUIRED_FIELDS[source]
         invalid_records: list[dict[str, object]] = []
@@ -97,5 +100,12 @@ class Validator:
                             "expected_session": expected_session,
                         }
                     )
+
+            for field, expected in (("session_key", expected_session),
+                                    ("meeting_key", expected_meeting)):
+                if expected is not None and str(record.get(field)) != str(expected):
+                    invalid_records.append({"source": source, "record_index": record_index,
+                                            "field": field, "reason": "mismatch",
+                                            "expected": expected, "value": record.get(field)})
 
         return not invalid_records, invalid_records

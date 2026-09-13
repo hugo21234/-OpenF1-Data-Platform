@@ -24,36 +24,17 @@ class LoadVerifier:
                 "One or more required environment variables are missing."
             )
 
-    def exists(
-        self,
-        table_name: str,
-        driver_number: int | None,
-        session_key: int,
-    ) -> bool:
-        filters = ["session_key = :session_key"]
-        parameters = [
-            {
-                "name": "session_key",
-                "type": "INT",
-                "value": str(session_key),
-            }
-        ]
 
-        if driver_number is not None:
-            filters.append("driver_number = :driver_number")
-            parameters.append(
-                {
-                    "name": "driver_number",
-                    "type": "INT",
-                    "value": str(driver_number),
-                }
-            )
-        statement = f"""
-            SELECT 1
-            FROM {table_name}
-            WHERE {' AND '.join(filters)}
-            LIMIT 1
-        """
+    def exists(self, table_name: str, driver_number: int | None,
+               meeting_key: int, session_key: int | None) -> bool:
+        filters = []
+        parameters = []
+        for name, value in (("meeting_key", meeting_key), ("session_key", session_key),
+                            ("driver_number", driver_number)):
+            if value is not None:
+                filters.append(f"{name} = :{name}")
+                parameters.append({"name": name, "type": "INT", "value": str(value)})
+        statement = f"SELECT 1 FROM {table_name} WHERE {' AND '.join(filters)} LIMIT 1"
         result = self.execute_statement(statement, parameters)
         return bool(result.get("result", {}).get("data_array"))
 

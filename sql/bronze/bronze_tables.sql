@@ -75,3 +75,42 @@ CREATE TABLE IF NOT EXISTS f1_plataform_data.bronze.race_control (
     scope STRING,
     sector DOUBLE
 );
+
+CREATE TABLE IF NOT EXISTS f1_plataform_data.bronze.meetings (
+    circuit_key INT,
+    circuit_image STRING,
+    circuit_info_url STRING,
+    circuit_short_name STRING,
+    circuit_type STRING,
+    country_code STRING,
+    country_flag STRING,
+    country_key INT,
+    country_name STRING,
+    date_end STRING,
+    date_start STRING,
+    gmt_offset STRING,
+    is_cancelled BOOLEAN,
+    location STRING,
+    meeting_key INT,
+    meeting_name STRING,
+    meeting_official_name STRING,
+    year INT
+);
+
+CREATE TABLE IF NOT EXISTS f1_plataform_data.bronze.sessions (
+    circuit_key INT,
+    circuit_short_name STRING,
+    country_code STRING,
+    country_key INT,
+    country_name STRING,
+    date_end STRING,
+    date_start STRING,
+    gmt_offset STRING,
+    is_cancelled BOOLEAN,
+    location STRING,
+    meeting_key INT,
+    session_key INT,
+    session_name STRING,
+    session_type STRING,
+    year INT
+);
