@@ -13,6 +13,7 @@ class BronzePipeline(Extractor):
         "/pit",
         "/position",
         "/race_control",
+        "/meetings",
     )
     SESSIONS_ENDPOINT = "/sessions"
     CAR_DATA_ENDPOINT = "/car_data"

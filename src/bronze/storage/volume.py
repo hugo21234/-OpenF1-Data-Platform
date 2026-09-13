@@ -24,7 +24,7 @@ class DatabricksVolumeStorage(VolumeStorage):
         },
         "drivers": {
             "broadcast_name": "STRING",
-            "country_code": "INT",
+            "country_code": "STRING",
             "driver_number": "BIGINT",
             "first_name": "STRING",
             "last_name": "STRING",
@@ -94,6 +94,43 @@ class DatabricksVolumeStorage(VolumeStorage):
             "scope": "STRING",
             "sector": "DOUBLE",
         },
+        "meetings": {
+    "circuit_key": "INT",
+    "circuit_image": "STRING",
+    "circuit_info_url": "STRING",
+    "circuit_short_name": "STRING",
+    "circuit_type": "STRING",
+    "country_code": "STRING",
+    "country_flag": "STRING",
+    "country_key": "INT",
+    "country_name": "STRING",
+    "date_end": "STRING",
+    "date_start": "STRING",
+    "gmt_offset": "STRING",
+    "is_cancelled": "BOOLEAN",
+    "location": "STRING",
+    "meeting_key": "INT",
+    "meeting_name": "STRING",
+    "meeting_official_name": "STRING",
+    "year": "INT",
+        },
+        "sessions": {
+    "circuit_key": "INT",
+    "circuit_short_name": "STRING",
+    "country_code": "STRING",
+    "country_key": "INT",
+    "country_name": "STRING",
+    "date_end": "STRING",
+    "date_start": "STRING",
+    "gmt_offset": "STRING",
+    "is_cancelled": "BOOLEAN",
+    "location": "STRING",
+    "meeting_key": "INT",
+    "session_key": "INT",
+    "session_name": "STRING",
+    "session_type": "STRING",
+    "year": "INT",
+},
     }
 
     def __init__(self) -> None:
@@ -121,8 +158,8 @@ class DatabricksVolumeStorage(VolumeStorage):
                 "One or more required environment variables are missing."
             )
 
-    def exists(self, source: str, session_key: str) -> bool:
-        _, file_url = self._urls(source, session_key)
+    def exists(self, source: str, session_key: str | None , meeting_key: str | None) -> bool:
+        _, file_url = self._urls(source, session_key,meeting_key)
         response = requests.head(
             file_url,
             headers=self._authorization_headers(),
@@ -137,7 +174,7 @@ class DatabricksVolumeStorage(VolumeStorage):
         response.raise_for_status()
         return False
 
-    def save(self,source: str,session_key: int,data: list[dict] ) -> None:
+    def save(self,source: str,session_key: int | None, meeting_key: str | None, data: list[dict] ) -> None:
         validator_source = (
             "car_data" if source.startswith("car_data_driver=") else source
         )
@@ -148,6 +185,7 @@ class DatabricksVolumeStorage(VolumeStorage):
         validation_passed, invalid_records = self.validator.validate(
             data,
             session_key,
+            meeting_key,
             validator_source,
         )
 
@@ -166,7 +204,7 @@ class DatabricksVolumeStorage(VolumeStorage):
             return
 
         parquet_data = dataframe.to_parquet(index=False)
-        directory_url, file_url = self._urls(source, session_key)
+        directory_url, file_url = self._urls(source, session_key, meeting_key)
         headers = self._authorization_headers()
 
         directory_response = requests.put(
@@ -233,8 +271,20 @@ class DatabricksVolumeStorage(VolumeStorage):
 
         return list(pd.array(value, dtype="Int64"))
 
-    def _urls(self, source: str, session_key: int | str) -> tuple[str, str]:
-        directory_path = f"{self.path_volume}/session_key={session_key}/"
+
+    def _urls(self, source: str, session_key: int | str | None , meeting_key: str) -> tuple[str, str]:
+
+        if meeting_key is None:
+            raise ValueError("meeting_key cannot be None.")
+        
+        if session_key is None:
+        
+                directory_path = f"{self.path_volume}/meeting_key={meeting_key}/"
+        
+        else:
+
+            directory_path = f"{self.path_volume}/meeting_key={meeting_key}/session_key={session_key}/"
+
         directory_url = (
             f"{self.databricks_host}{self.directories_prefix}{directory_path}"
         )
