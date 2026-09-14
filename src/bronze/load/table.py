@@ -77,13 +77,47 @@ class DatabricksTableLoader(TableLoader):
                 )
                 FILEFORMAT = PARQUET
             """
+        elif source == "meetings":
+            statement = f"""
+                COPY INTO {table_name}
+                FROM (
+                    SELECT
+                        CAST(circuit_key AS INT) AS circuit_key,
+                        CAST(circuit_short_name AS STRING) AS circuit_short_name,
+                        CAST(country_code AS STRING) AS country_code,
+                        CAST(country_flag AS STRING) AS country_flag,
+                        CAST(country_key AS INT) AS country_key,
+                        CAST(country_name AS STRING) AS country_name,
+                        CAST(date_end AS STRING) AS date_end,
+                        CAST(date_start AS STRING) AS date_start,
+                        CAST(gmt_offset AS STRING) AS gmt_offset,
+                        CAST(is_cancelled AS BOOLEAN) AS is_cancelled,
+                        CAST(location AS STRING) AS location,
+                        CAST(meeting_key AS INT) AS meeting_key,
+                        CAST(meeting_name AS STRING) AS meeting_name,
+                        CAST(meeting_official_name AS STRING) AS meeting_official_name,
+                        CAST(year AS INT) AS year
+                    FROM '{file_path}'
+                )
+                FILEFORMAT = PARQUET
+            """
+            
         else:
             statement = f"""
                 COPY INTO {table_name}
                 FROM '{file_path}'
                 FILEFORMAT = PARQUET
             """
-        self.verifier.execute_statement(statement)
+        try:
+            self.verifier.execute_statement(statement)
+        except ValueError as error:
+            raise ValueError(
+                f"Falha no COPY INTO.\n"
+                f"Tabela: {table_name}\n"
+                f"Arquivo: {file_path}\n"
+                f"SQL: {statement.strip()}\n"
+                f"Erro Databricks: {error}"
+            ) from error
 
         print(
             f"Data loaded to table={table_name} "
