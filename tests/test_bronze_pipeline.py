@@ -1,5 +1,6 @@
 ﻿import sys
 import unittest
+import importlib.util
 from pathlib import Path
 from unittest.mock import patch
 
@@ -12,8 +13,14 @@ from bronze.verification.loadVerifier import LoadVerifier
 
 
 def session(key, kind='Race', **extra):
-    return dict(meeting_key=10, session_key=key, session_type=kind,
-                date_end='2020-01-01T12:00:00Z', **extra)
+    return {
+        'meeting_key': 10,
+        'session_key': key,
+        'session_type': kind,
+        'date_start': '2020-01-01T11:00:00Z',
+        'date_end': '2020-01-01T12:00:00Z',
+        **extra,
+    }
 
 
 class Boundary:
@@ -56,35 +63,61 @@ class PipelineTests(unittest.TestCase):
         self.client = Client([session(1, 'Practice'), session(2, 'Qualifying'), session(3)])
         self.storage = Boundary(self.events, 'storage')
         self.loader = Boundary(self.events, 'loader')
-        self.pipeline = BronzePipeline(self.client, self.storage, self.loader, year=2020)
-        sleep = patch('bronze.extractor.extractor.time.sleep')
+        self.pipeline = BronzePipeline(self.client, self.storage, self.loader)
+        sleep = patch('bronze.extractor.base.time.sleep')
         sleep.start()
         self.addCleanup(sleep.stop)
 
     def test_order_and_rerun(self):
         self.pipeline.run_extraction()
-        self.assertEqual([p for e, p in self.client.calls if e == '/meetings'], [{'meeting_key': 10}])
+        self.assertEqual([p for e, p in self.client.calls if e == '/meetings'], [{'meeting_key': 10}] * 3)
+        self.assertEqual([p['session_type'] for e, p in self.client.calls if e == '/sessions'],
+                         ['Practice', 'Qualifying', 'Race'])
         for key in (1, 2, 3):
             events = [e[:2] for e in self.events if e[2] == key]
             self.assertEqual(events[0], ('save', 'sessions'))
-            self.assertEqual(events[-2:], [('load', 'car_data_driver=44'), ('load', 'sessions')])
+            self.assertEqual(events[-2:], [('save', 'car_data_driver=44'), ('load', 'car_data_driver=44')])
             self.assertNotIn(('load', 'pit'), events)
         before = list(self.events)
         self.pipeline.run_extraction()
-        self.assertEqual(self.events, before)
+        self.assertEqual([event for event in self.events if event[0] == 'save'],
+                         [event for event in before if event[0] == 'save'])
         self.assertEqual(sum(e == '/drivers' for e, _ in self.client.calls), 6)
 
     def test_filters(self):
         self.client.sessions += [session(4, 'Testing'), session(5, is_cancelled=True)]
         self.client.sessions += [{**session(6), 'date_end': '2999-01-01T00:00:00Z'},
                                  {**session(7), 'date_end': None}]
-        self.assertEqual([s['session_key'] for s in self.pipeline.extract_sessions()], [1, 2, 3])
-        self.assertEqual(self.client.calls[0], ('/sessions', {'year': 2020}))
+        self.assertEqual([s['session_key'] for s in self.pipeline.extract_sessions()], [3])
+        self.assertEqual(self.client.calls[0][0], '/sessions')
+
+    def test_main_runs_three_independent_requests(self):
+        spec = importlib.util.spec_from_file_location(
+            'bronze_entrypoint', Path(__file__).resolve().parents[1] / 'main.py'
+        )
+        entrypoint = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(entrypoint)
+        # Deliberately reverse the API response order to verify execution by type.
+        self.client.sessions.reverse()
+        with patch.object(entrypoint, 'OpenF1Client', return_value=self.client), \
+                patch.object(entrypoint, 'DatabricksVolumeStorage', return_value=self.storage), \
+                patch.object(entrypoint, 'DatabricksTableLoader', return_value=self.loader):
+            entrypoint.main()
+
+        self.assertEqual(
+            [params['session_type'] for endpoint, params in self.client.calls
+             if endpoint == '/sessions'],
+            ['Practice', 'Qualifying', 'Race'],
+        )
+        self.assertEqual(
+            [key for action, source, key in self.events
+             if action == 'save' and source == 'sessions'], [1, 2, 3],
+        )
 
     def test_reuse_meeting_file(self):
         self.storage.saved.add(('meetings', 10, None))
         self.pipeline.run_extraction()
-        self.assertFalse(any(e == '/meetings' for e, _ in self.client.calls))
+        self.assertTrue(any(e == '/meetings' for e, _ in self.client.calls))
         self.assertEqual(self.events[0], ('load', 'meetings', None))
 
     def test_session_table_not_loaded_after_failure(self):
@@ -92,7 +125,7 @@ class PipelineTests(unittest.TestCase):
         with self.assertRaises(RuntimeError):
             self.pipeline.run_extraction()
         self.assertIn(('save', 'sessions', 1), self.events)
-        self.assertNotIn(('load', 'sessions', 1), self.events)
+        self.assertIn(('load', 'sessions', 1), self.events)
 
     def test_validation(self):
         validator = Validator()

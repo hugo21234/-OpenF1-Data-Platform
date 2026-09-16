@@ -7,7 +7,7 @@ from requests import Response
 from requests.exceptions import HTTPError
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
-from bronze.extractor.extractor import BronzePipeline
+from bronze.extractor.race import RequestRace
 
 
 class CarDataWindowTests(unittest.TestCase):
@@ -16,8 +16,8 @@ class CarDataWindowTests(unittest.TestCase):
         self.storage = Mock()
         self.storage.exists.return_value = False
         self.loader = Mock()
-        self.pipeline = BronzePipeline(self.client, self.storage, self.loader)
-        sleep = patch("bronze.extractor.extractor.time.sleep")
+        self.pipeline = RequestRace(self.client, self.storage, self.loader)
+        sleep = patch("bronze.extractor.base.time.sleep")
         sleep.start()
         self.addCleanup(sleep.stop)
 
