@@ -1,8 +1,8 @@
 # Declarative Automation Bundle (DAB) - OpenF1 Data Platform
-# Define both ETL jobs as code for version control and CI/CD deployment.
+# Defines the partitioned ETL job as code for version control and CI/CD deployment.
 #
 # Deploy:  databricks bundle deploy --target dev
-# Run:     databricks bundle run --target dev f1_etl_bronze_to_gold
+# Run:     databricks bundle run --target dev f1_etl_partitioned
 
 bundle:
   name: openf1-data-platform
@@ -22,62 +22,8 @@ targets:
 resources:
   jobs:
     # ============================================
-    # Job 1: Bronze to Gold (single extraction)
-    # ============================================
-    f1_etl_bronze_to_gold:
-      name: "OpenF1 ETL Pipeline - Bronze to Gold"
-      queue:
-        enabled: true
-      max_concurrent_runs: 1
-      trigger:
-        periodic:
-          interval: 1
-          unit: DAYS
-      environments:
-        - environment_key: default
-          spec:
-            client: "2"
-            dependencies:
-              - "pandas>=2.2,<3"
-              - "pyarrow==25.0.1"
-              - "python-dotenv>=1,<2"
-              - "requests==2.34.2"
-              - "certifi==2026.7.22"
-              - "charset-normalizer==3.5.0"
-              - "idna==3.18"
-              - "urllib3==2.7.0"
-      tasks:
-        - task_key: Bronze_Extraction
-          run_if: ALL_SUCCESS
-          environment_key: default
-          spark_python_task:
-            python_file: ./main.py
-          description: "Extrai dados da API OpenF1 e carrega no Volume + Bronze Tables"
-
-        - task_key: Silver_Transformations
-          depends_on:
-            - task_key: Bronze_Extraction
-          run_if: ALL_SUCCESS
-          sql_task:
-            file:
-              path: ./sql/silver/silver_transformations_runner.sql
-              source: WORKSPACE
-            warehouse_id: ${var.warehouse_id}
-          description: "Executa transformacoes Silver (drivers, car_data, pits, laps, position, race_control, stints)"
-
-        - task_key: Gold_Load
-          depends_on:
-            - task_key: Silver_Transformations
-          run_if: ALL_SUCCESS
-          sql_task:
-            file:
-              path: ./sql/gold/gold_load_runner.sql
-              source: WORKSPACE
-            warehouse_id: ${var.warehouse_id}
-          description: "Carrega camada Gold (dimensoes: dim_drivers, dim_teams; fatos: fact_laps, fact_pit, fact_position, fact_car_data, fact_race_control, fact_stints)"
-
-    # ============================================
-    # Job 2: Partitioned (Practice / Qualifying / Race)
+    # OpenF1 ETL Pipeline - Partitioned (Bronze-Silver-Gold)
+    # Extraction split: Practice / Qualifying / Race
     # ============================================
     f1_etl_partitioned:
       name: "OpenF1 ETL Pipeline - Partitioned (Bronze-Silver-Gold)"
