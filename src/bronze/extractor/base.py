@@ -35,7 +35,6 @@ class BaseSessionExtractor(Extractor, ABC):
             self.SESSIONS_ENDPOINT,
             params={"year": time.localtime().tm_year, "session_type": self.session_type},
         )
-        time.sleep(2)
 
         now = datetime.now(timezone.utc)
         completed_sessions = []
@@ -65,7 +64,6 @@ class BaseSessionExtractor(Extractor, ABC):
                 meetings = self.client.get_data(
                     self.MEETINGS_ENDPOINT, {"meeting_key": meeting_key}
                 )
-                time.sleep(2)
                 if not meetings:
                     raise ValueError(f"Meeting {meeting_key} was not returned by OpenF1.")
                 self._save_and_load("meetings", meeting_key, None, meetings)
@@ -75,7 +73,6 @@ class BaseSessionExtractor(Extractor, ABC):
             drivers_numbers: list[int] = []
             for endpoint in self.endpoint:
                 data = self.client.get_data(endpoint, {"session_key": session_key})
-                time.sleep(2)
                 if endpoint == "/drivers":
                     drivers_numbers = [driver["driver_number"] for driver in data]
                 self._save_and_load(endpoint.strip("/"), meeting_key, session_key, data)
@@ -125,11 +122,9 @@ class BaseSessionExtractor(Extractor, ABC):
                 except HTTPError as error:
                     if error.response is not None and error.response.status_code == 404:
                         inicio = fim
-                        time.sleep(3)
                         continue
                     raise
                 data.extend(dados)
-                time.sleep(3)
                 inicio = fim
             self._save_and_load(source, meeting_key, session_key, data)
 
